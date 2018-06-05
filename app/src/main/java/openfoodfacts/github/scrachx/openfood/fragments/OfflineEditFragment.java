@@ -26,6 +26,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -118,6 +119,7 @@ public class OfflineEditFragment extends NavigationBaseFragment implements SaveL
     @OnClick(R.id.buttonSendAll)
     protected void onSendAllProducts() {
         if (!Utils.isAirplaneModeActive(getContext()) && Utils.isNetworkConnected(getContext()) && PreferenceManager.getDefaultSharedPreferences(getContext()).getBoolean("enableMobileDataUpload", true)) {
+            showProgressDialog();
             uploadProducts();
         } else if (Utils.isAirplaneModeActive(getContext())) {
             new MaterialDialog.Builder(getActivity())
@@ -162,6 +164,18 @@ public class OfflineEditFragment extends NavigationBaseFragment implements SaveL
         SharedPreferences.Editor editor = getContext().getSharedPreferences("usage", 0).edit();
         editor.putBoolean("firstUpload", true);
         editor.apply();
+    }
+
+    private void showProgressDialog() {
+
+        LayoutInflater inflater =(LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View myView = inflater.inflate(R.layout.save_list_item, null);
+
+        View progressDialog = myView.findViewById(R.id.uploadOfflineProgressDialog);
+        ImageView imageIcon = myView.findViewById(R.id.iconSave);
+        progressDialog.setVisibility(View.VISIBLE);
+        imageIcon.setVisibility(View.GONE);
+
     }
 
     @Override
