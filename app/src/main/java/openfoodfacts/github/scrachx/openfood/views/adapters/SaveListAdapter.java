@@ -1,5 +1,6 @@
 package openfoodfacts.github.scrachx.openfood.views.adapters;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.support.v7.content.res.AppCompatResources;
@@ -8,6 +9,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
@@ -23,12 +25,14 @@ public class SaveListAdapter extends RecyclerView.Adapter<SaveListAdapter.SaveVi
     private final Context context;
     private final List<SaveItem> saveItems;
     private SaveClickInterface mSaveClickInterface;
+    private static boolean isUploading;
 
 
     public SaveListAdapter(Context context, List<SaveItem> saveItems, SaveClickInterface saveClickInterface) {
         this.context = context;
         this.saveItems = saveItems;
         this.mSaveClickInterface = saveClickInterface;
+        isUploading = false;
     }
 
     @Override
@@ -41,6 +45,12 @@ public class SaveListAdapter extends RecyclerView.Adapter<SaveListAdapter.SaveVi
     public void onBindViewHolder(SaveViewHolder holder, int position) {
 
         SaveItem item = saveItems.get(position);
+
+        if(isUploading){
+            holder.imgIcon.setVisibility(View.GONE);
+            holder.progressBar.showContextMenu();
+            holder.progressBar.setVisibility(View.VISIBLE);
+        }
 
         holder.imgIcon.setImageDrawable(AppCompatResources.getDrawable(context, item.getIcon()));
         holder.txtTitle.setText(item.getTitle());
@@ -67,6 +77,10 @@ public class SaveListAdapter extends RecyclerView.Adapter<SaveListAdapter.SaveVi
         void onLongClick(int position);
     }
 
+    public static void setIsUploading(boolean isUploading) {
+        SaveListAdapter.isUploading = isUploading;
+    }
+
     class SaveViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
         ImageView imgIcon;
         TextView txtTitle;
@@ -74,6 +88,7 @@ public class SaveListAdapter extends RecyclerView.Adapter<SaveListAdapter.SaveVi
         ImageView imgProduct;
         TextView txtWeight;
         TextView txtBrand;
+        ProgressBar progressBar;
 
         public SaveViewHolder(View itemView) {
             super(itemView);
@@ -83,6 +98,7 @@ public class SaveListAdapter extends RecyclerView.Adapter<SaveListAdapter.SaveVi
             imgProduct = itemView.findViewById(R.id.imgSaveProduct);
             txtWeight = itemView.findViewById(R.id.offlineWeight);
             txtBrand = itemView.findViewById(R.id.offlineBrand);
+            progressBar = itemView.findViewById(R.id.uploadOfflineProgressBar);
             itemView.setOnClickListener(this);
             itemView.setOnLongClickListener(this);
         }

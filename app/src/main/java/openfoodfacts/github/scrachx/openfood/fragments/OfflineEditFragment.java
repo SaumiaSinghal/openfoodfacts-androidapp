@@ -26,7 +26,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -119,7 +118,6 @@ public class OfflineEditFragment extends NavigationBaseFragment implements SaveL
     @OnClick(R.id.buttonSendAll)
     protected void onSendAllProducts() {
         if (!Utils.isAirplaneModeActive(getContext()) && Utils.isNetworkConnected(getContext()) && PreferenceManager.getDefaultSharedPreferences(getContext()).getBoolean("enableMobileDataUpload", true)) {
-            showProgressDialog();
             uploadProducts();
         } else if (Utils.isAirplaneModeActive(getContext())) {
             new MaterialDialog.Builder(getActivity())
@@ -166,18 +164,6 @@ public class OfflineEditFragment extends NavigationBaseFragment implements SaveL
         editor.apply();
     }
 
-    private void showProgressDialog() {
-
-        LayoutInflater inflater =(LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        View myView = inflater.inflate(R.layout.save_list_item, null);
-
-        View progressDialog = myView.findViewById(R.id.uploadOfflineProgressDialog);
-        ImageView imageIcon = myView.findViewById(R.id.iconSave);
-        progressDialog.setVisibility(View.VISIBLE);
-        imageIcon.setVisibility(View.GONE);
-
-    }
-
     @Override
     @NavigationDrawerType
     public int getNavigationDrawerType() {
@@ -188,6 +174,10 @@ public class OfflineEditFragment extends NavigationBaseFragment implements SaveL
      * Upload the offline products.
      */
     private void uploadProducts() {
+
+        SaveListAdapter.setIsUploading(true);
+        mRecyclerView.getAdapter().notifyDataSetChanged();
+
         OpenFoodAPIClient apiClient = new OpenFoodAPIClient(getActivity());
         final List<SendProduct> listSaveProduct = mSendProductDao.loadAll();
         size = saveItems.size();
