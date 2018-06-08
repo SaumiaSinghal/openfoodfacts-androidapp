@@ -52,6 +52,7 @@ ext {
     openCsvVersion = '4.1'
 
     journeyappsZxingScannerVersion = '3.6.0'
+    barcodescannerZxingVersion = '1.9.8'
     zxingCoreVersion = '3.3.0' //For Android 14+ support zxing:core should be 3.3.0 or earlier
 
     htmlDomVersion = '1.11.2'

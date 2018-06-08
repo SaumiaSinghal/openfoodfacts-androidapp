@@ -8,12 +8,18 @@ import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.text.Html;
 import android.util.Log;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.firebase.jobdispatcher.JobParameters;
+import com.squareup.picasso.Picasso;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -26,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import io.reactivex.schedulers.Schedulers;
+import me.dm7.barcodescanner.zxing.ZXingScannerView;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
@@ -44,6 +51,7 @@ import openfoodfacts.github.scrachx.openfood.models.State;
 import openfoodfacts.github.scrachx.openfood.models.ToUploadProduct;
 import openfoodfacts.github.scrachx.openfood.models.ToUploadProductDao;
 import openfoodfacts.github.scrachx.openfood.utils.Utils;
+import openfoodfacts.github.scrachx.openfood.views.FullScreenImage;
 import openfoodfacts.github.scrachx.openfood.views.SaveProductOfflineActivity;
 import openfoodfacts.github.scrachx.openfood.views.product.ProductActivity;
 import retrofit2.Call;
@@ -57,6 +65,7 @@ import static openfoodfacts.github.scrachx.openfood.models.ProductImageField.FRO
 import static openfoodfacts.github.scrachx.openfood.models.ProductImageField.INGREDIENTS;
 import static openfoodfacts.github.scrachx.openfood.models.ProductImageField.NUTRITION;
 import static openfoodfacts.github.scrachx.openfood.network.OpenFoodAPIService.PRODUCT_API_COMMENT;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 public class OpenFoodAPIClient {
 
@@ -181,6 +190,120 @@ public class OpenFoodAPIClient {
 
     }
 
+    /**
+     * Open the dialog with short product details.
+     * Also add it in the history if the product exist.
+     *
+     * @param barcode       product barcode
+     * @param activity
+     * @param camera        needed when the function is called by the barcodefragment else null
+     * @param resultHandler needed when the function is called by the barcodefragment else null
+     */
+    public void getShortProduct(final String barcode, final Activity activity, final ZXingScannerView camera, final ZXingScannerView.ResultHandler
+            resultHandler) {
+
+         apiService.getShortProductByBarcode(barcode).enqueue(new Callback<State>() {
+         @Override
+         public void onResponse(@NonNull Call<State> call, @NonNull Response<State> response) {
+             final State s = response.body();
+             if (s.getStatus() == 0) {
+                new MaterialDialog.Builder(activity)
+                .title(R.string.txtDialogsTitle)
+                .content(R.string.txtDialogsContent)
+                .positiveText(R.string.txtYes)
+                .negativeText(R.string.txtNo)
+                .onPositive((dialog, which) -> {
+                    Intent intent = new Intent(activity, SaveProductOfflineActivity.class);
+                    State st = new State();
+                    Product pd = new Product();
+                    pd.setCode(barcode);
+                    st.setProduct(pd);
+                    Bundle bundle = new Bundle();
+                    bundle.putSerializable("state", st);
+                    intent.putExtras(bundle);
+                    activity.startActivity(intent);
+                    activity.finish();
+                })
+                .onNegative((dialog, which) -> activity.onBackPressed())
+                .show();
+             } else {
+                 final Product product = s.getProduct();
+                 new HistoryTask().doInBackground(s.getProduct());
+
+                 MaterialDialog dialog = new MaterialDialog.Builder(activity)
+                 .title(product.getProductName())
+                 .customView(R.layout.alert_powermode_image, true)
+                 .neutralText(R.string.txtOk)
+                 .positiveText(R.string.txtSeeMore)
+                 .onPositive((materialDialog, which) -> getProduct(barcode, activity))
+                 .onNeutral((materialDialog, which) -> camera.resumeCameraPreview(resultHandler))
+                 .build();
+
+                 ImageView imgPhoto = dialog.getCustomView().findViewById(R.id.imagePowerModeProduct);
+                 ImageView imgNutriscore = dialog.getCustomView().findViewById(R.id.imageGrade);
+                 TextView quantityProduct = dialog.getCustomView().findViewById(R.id.textQuantityProduct);
+                 TextView brandProduct = dialog.getCustomView().findViewById(R.id.textBrandProduct);
+
+                 if (product.getQuantity() != null && !product.getQuantity().trim().isEmpty()) {
+                     quantityProduct.setText(Html.fromHtml("<b>" + activity.getResources().getString(R.string.txtQuantity) + "</b>" + ' ' +
+                     product.getQuantity()));
+                 } else {
+                     quantityProduct.setVisibility(View.GONE);
+                 }
+                 if (product.getBrands() != null && !product.getBrands().trim().isEmpty()) {
+                     brandProduct.setText(Html.fromHtml("<b>" + activity.getResources().getString(R.string.txtBrands) + "</b>" + ' ' + product
+                             .getBrands()));
+                 } else {
+                     brandProduct.setVisibility(View.GONE);
+                 }
+                 if (isNotEmpty(s.getProduct().getImageUrl())) {
+                     Picasso.with(activity)
+                     .load(Utils.getImageGrade(product.getNutritionGradeFr()))
+                     .into(imgNutriscore);
+                 }
+                 if (isNotEmpty(s.getProduct().getImageUrl())) {
+                     Picasso.with(activity)
+                     .load(s.getProduct().getImageUrl())
+                             .into(imgPhoto);
+                     imgPhoto.setOnClickListener(view -> {
+                         Intent intent = new Intent(view.getContext(), FullScreenImage.class);
+                         Bundle bundle = new Bundle();
+                         bundle.putString("imageurl", product.getImageUrl());
+                         intent.putExtras(bundle);
+                         activity.startActivity(intent);
+                     });
+                 }
+                 dialog.show();
+
+             }
+         }
+
+         @Override
+         public void onFailure(@NonNull Call<State> call, @NonNull Throwable t) {
+             new MaterialDialog.Builder(activity)
+             .title(R.string.txtDialogsTitle)
+             .content(R.string.txtDialogsContent)
+             .positiveText(R.string.txtYes)
+             .negativeText(R.string.txtNo)
+             .onPositive((dialog, which) -> {
+                 Intent intent = new Intent(activity, SaveProductOfflineActivity.class);
+                 State st = new State();
+                 Product pd = new Product();
+                 pd.setCode(barcode);
+                 st.setProduct(pd);
+                 Bundle bundle = new Bundle();
+                 bundle.putSerializable("state", st);
+                 intent.putExtras(bundle);
+                 activity.startActivity(intent);
+                 activity.finish();
+             })
+             .onNegative((dialog, which) -> activity.onBackPressed())
+             .show();
+             Toast.makeText(activity, activity.getString(R.string.errorWeb), Toast.LENGTH_LONG).show();
+         }
+         });
+    }
+
     public void searchProduct(final String name, final int page, final Activity activity, final OnProductsCallback productsCallback) {
         apiService.searchProductByName(name, page).enqueue(new Callback<Search>() {
             @Override
@@ -215,13 +338,13 @@ public class OpenFoodAPIClient {
         }
 
         String imguploadFront = product.getImgupload_front();
-        if (StringUtils.isNotEmpty(imguploadFront)) {
+        if (isNotEmpty(imguploadFront)) {
             ProductImage image = new ProductImage(product.getBarcode(), FRONT, new File(imguploadFront));
             postImg(activity, image);
         }
 
         String imguploadIngredients = product.getImgupload_ingredients();
-        if (StringUtils.isNotEmpty(imguploadIngredients)) {
+        if (isNotEmpty(imguploadIngredients)) {
             postImg(activity, new ProductImage(product.getBarcode(), INGREDIENTS, new File(imguploadIngredients)));
         }
 
@@ -1105,13 +1228,13 @@ public class OpenFoodAPIClient {
         }
 
         String imguploadFront = product.getImgupload_front();
-        if (StringUtils.isNotEmpty(imguploadFront)) {
+        if (isNotEmpty(imguploadFront)) {
             ProductImage image = new ProductImage(product.getBarcode(), FRONT, new File(imguploadFront));
             postImg(context, image);
         }
 
         String imguploadIngredients = product.getImgupload_ingredients();
-        if (StringUtils.isNotEmpty(imguploadIngredients)) {
+        if (isNotEmpty(imguploadIngredients)) {
             postImg(context, new ProductImage(product.getBarcode(), INGREDIENTS, new File(imguploadIngredients)));
         }
 
